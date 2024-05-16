@@ -242,11 +242,6 @@ impl Column {
                 skip_deserializing
             });
         }
-        println!(
-            "self. coltype : {:?}   self.info: {:?}",
-            self.col_type,
-            self.col_info()
-        );
         if serde_skip_option_none && !self.not_null {
             serde_tokens.push(quote! {
                 skip_serializing_if = "Option::is_none"
