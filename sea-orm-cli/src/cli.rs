@@ -247,6 +247,13 @@ pub enum GenerateSubcommands {
         #[arg(
             long,
             default_value = "false",
+            help = "Generate a serde field attribute, '#[serde(skip_serializing_if=\"Option::is_none\")] if you don't want serde the `None` field"
+        )]
+        serde_skip_option_none: bool,
+
+        #[arg(
+            long,
+            default_value = "false",
             long_help = "Automatically derive the Copy trait on generated enums.\n\
             Enums generated from a database don't have associated data by default, and as such can \
             derive Copy.

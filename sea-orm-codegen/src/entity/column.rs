@@ -229,17 +229,36 @@ impl Column {
         is_primary_key: bool,
         serde_skip_deserializing_primary_key: bool,
         serde_skip_hidden_column: bool,
+        serde_skip_option_none: bool,
     ) -> TokenStream {
+        let mut serde_tokens: Vec<TokenStream> = vec![];
+
         if self.name.starts_with('_') && serde_skip_hidden_column {
-            quote! {
-                #[serde(skip)]
-            }
+            serde_tokens.push(quote! {
+                skip
+            });
         } else if serde_skip_deserializing_primary_key && is_primary_key {
-            quote! {
-                #[serde(skip_deserializing)]
-            }
-        } else {
+            serde_tokens.push(quote! {
+                skip_deserializing
+            });
+        }
+        println!(
+            "self. coltype : {:?}   self.info: {:?}",
+            self.col_type,
+            self.col_info()
+        );
+        if serde_skip_option_none && !self.not_null {
+            serde_tokens.push(quote! {
+                skip_serializing_if = "Option::is_none"
+            })
+        }
+        let combined_serde_token = quote! {
+            #(#serde_tokens),*
+        };
+        if serde_tokens.len() == 0 {
             quote! {}
+        } else {
+            quote! {#[serde(#combined_serde_token)]}
         }
     }
 

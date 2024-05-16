@@ -384,6 +384,7 @@ mod tests {
                     &None,
                     false,
                     false,
+                    false,
                     &Default::default(),
                     &Default::default(),
                     false,
