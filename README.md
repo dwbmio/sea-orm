@@ -188,22 +188,41 @@ fruit::Entity::delete_many()
 
 ```
 
-## 🧭 Seaography: GraphQL integration (preview)
+## 🧭 Seaography: instant GraphQL API
 
 [Seaography](https://github.com/SeaQL/seaography) is a GraphQL framework built on top of SeaORM. Seaography allows you to build GraphQL resolvers quickly. With just a few commands, you can launch a GraphQL server from SeaORM entities!
 
-Starting `0.12`, `seaography` integration is built into `sea-orm`. While Seaography development is still in an early stage, it is especially useful in prototyping and building internal-use admin panels.
+Look at the [Seaography Example](https://github.com/SeaQL/sea-orm/tree/master/examples/seaography_example) to learn more.
 
 <img src="https://raw.githubusercontent.com/SeaQL/sea-orm/master/examples/seaography_example/Seaography%20example.png"/>
 
-Look at the [Seaography Example](https://github.com/SeaQL/sea-orm/tree/master/examples/seaography_example) to learn more.
+## 🖥️ SeaORM Pro: Effortless Admin Panel
 
-## Learn More
+[SeaORM Pro](https://www.sea-ql.org/sea-orm-pro/) is an admin panel solution allowing you to quickly and easily launch an admin panel for your application - frontend development skills not required, but certainly nice to have!
 
-1. [Design](https://github.com/SeaQL/sea-orm/tree/master/DESIGN.md)
-1. [Architecture](https://www.sea-ql.org/SeaORM/docs/internal-design/architecture/)
-1. [Engineering](https://www.sea-ql.org/blog/2022-07-30-engineering/)
-1. [Change Log](https://github.com/SeaQL/sea-orm/tree/master/CHANGELOG.md)
+Features:
+
++ Full CRUD
++ Built on React + GraphQL
++ Built-in GraphQL resolver
++ Customize the UI with simple TOML
+
+Learn More
+
++ [Example Repo](https://github.com/SeaQL/sea-orm-pro)
++ [Getting Started with Loco](https://www.sea-ql.org/sea-orm-pro/docs/install-and-config/getting-started-loco/)
++ [Getting Started with Axum](https://www.sea-ql.org/sea-orm-pro/docs/install-and-config/getting-started-axum/)
+
+![](https://raw.githubusercontent.com/SeaQL/sea-orm/refs/heads/master/docs/sea-orm-pro-dark.png#gh-dark-mode-only)
+![](https://raw.githubusercontent.com/SeaQL/sea-orm/refs/heads/master/docs/sea-orm-pro-light.png#gh-light-mode-only)
+
+## Releases
+
+[SeaORM 1.0](https://www.sea-ql.org/blog/2024-08-04-sea-orm-1.0/) is a stable release. The 1.x version will be updated until at least October 2025, and we'll decide whether to release a 2.0 version or extend the 1.x life cycle.
+
+It doesn't mean that SeaORM is 'done', we've designed an architecture to allow us to deliver new features without major breaking changes. In fact, more features are coming!
+
++ [Change Log](https://github.com/SeaQL/sea-orm/tree/master/CHANGELOG.md)
 
 ### Who's using SeaORM?
 
@@ -226,7 +245,7 @@ Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
 
-SeaORM is a community driven project. We welcome you to participate, contribute and together help build Rust's future.
+We invite you to participate, contribute and together help build Rust's future.
 
 A big shout out to our contributors!
 
@@ -236,16 +255,19 @@ A big shout out to our contributors!
 
 [SeaQL.org](https://www.sea-ql.org/) is an independent open-source organization run by passionate developers. If you enjoy using our libraries, please star and share our repositories. If you feel generous, a small donation via [GitHub Sponsor](https://github.com/sponsors/SeaQL) will be greatly appreciated, and goes a long way towards sustaining the organization.
 
-We invite you to participate, contribute and together help build Rust's future.
+### Silver Sponsors
 
-### Gold Sponsors
+<table><tr>
+<td><a href="https://www.digitalocean.com/">
+  <img src="https://www.sea-ql.org/static/sponsors/DigitalOcean.svg" width="125">
+</a></td>
 
-<a href="https://osmos.io/">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://www.sea-ql.org/static/sponsors/Osmos-dark.svg">
-    <img src="https://www.sea-ql.org/static/sponsors/Osmos.svg" width="238">
-  </picture>
-</a>
+<td><a href="https://www.jetbrains.com/">
+  <img src="https://www.sea-ql.org/static/sponsors/JetBrains.svg" width="125">
+</a></td>
+</tr></table>
+
+We’re immensely grateful to our sponsors: Digital Ocean, for sponsoring our servers. And JetBrains, for sponsoring our IDE.
 
 ## Mascot
 

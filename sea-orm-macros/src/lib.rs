@@ -540,11 +540,11 @@ pub fn derive_active_model_behavior(input: TokenStream) -> TokenStream {
 ///         - Possible values: `String`, `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`
 ///         - Note that value has to be passed as string, i.e. `rs_type = "i8"`
 ///     - `db_type`: Define `ColumnType` returned by `ActiveEnum::db_type()`
-///         - Possible values: all available enum variants of `ColumnType`, e.g. `String(None)`, `String(Some(1))`, `Integer`
+///         - Possible values: all available enum variants of `ColumnType`, e.g. `String(StringLen::None)`, `String(StringLen::N(1))`, `Integer`
 ///         - Note that value has to be passed as string, i.e. `db_type = "Integer"`
 ///     - `enum_name`: Define `String` returned by `ActiveEnum::name()`
 ///         - This attribute is optional with default value being the name of enum in camel-case
-///         - Note that value has to be passed as string, i.e. `db_type = "Integer"`
+///         - Note that value has to be passed as string, i.e. `enum_name = "MyEnum"`
 ///
 /// - For enum variant
 ///     - `string_value` or `num_value`:
@@ -675,13 +675,9 @@ pub fn derive_relation(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(DeriveRelatedEntity, attributes(sea_orm))]
 pub fn derive_related_entity(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    if cfg!(feature = "seaography") {
-        derives::expand_derive_related_entity(input)
-            .unwrap_or_else(Error::into_compile_error)
-            .into()
-    } else {
-        TokenStream::new()
-    }
+    derives::expand_derive_related_entity(input)
+        .unwrap_or_else(Error::into_compile_error)
+        .into()
 }
 
 /// The DeriveMigrationName derive macro will implement `sea_orm_migration::MigrationName` for a migration.

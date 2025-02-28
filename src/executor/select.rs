@@ -4,7 +4,7 @@ use crate::{
     QueryResult, QuerySelect, Select, SelectA, SelectB, SelectTwo, SelectTwoMany, Statement,
     StreamTrait, TryGetableMany,
 };
-use futures::{Stream, TryStreamExt};
+use futures_util::{Stream, TryStreamExt};
 use sea_query::{SelectStatement, Value};
 use std::collections::HashMap;
 use std::{hash::Hash, marker::PhantomData, pin::Pin};
@@ -412,7 +412,7 @@ where
     }
 
     /// Get one Model from the SELECT query
-    pub async fn one<'a, C>(self, db: &C) -> Result<Option<E::Model>, DbErr>
+    pub async fn one<C>(self, db: &C) -> Result<Option<E::Model>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -420,7 +420,7 @@ where
     }
 
     /// Get all Models from the SELECT query
-    pub async fn all<'a, C>(self, db: &C) -> Result<Vec<E::Model>, DbErr>
+    pub async fn all<C>(self, db: &C) -> Result<Vec<E::Model>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -490,7 +490,7 @@ where
     }
 
     /// Get one Model from the Select query
-    pub async fn one<'a, C>(self, db: &C) -> Result<Option<(E::Model, Option<F::Model>)>, DbErr>
+    pub async fn one<C>(self, db: &C) -> Result<Option<(E::Model, Option<F::Model>)>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -498,7 +498,7 @@ where
     }
 
     /// Get all Models from the Select query
-    pub async fn all<'a, C>(self, db: &C) -> Result<Vec<(E::Model, Option<F::Model>)>, DbErr>
+    pub async fn all<C>(self, db: &C) -> Result<Vec<(E::Model, Option<F::Model>)>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -600,7 +600,7 @@ where
     /// > then use [`ModelTrait::find_related`] on the model.
     /// >
     /// > See https://www.sea-ql.org/SeaORM/docs/basic-crud/select#lazy-loading for details.
-    pub async fn all<'a, C>(self, db: &C) -> Result<Vec<(E::Model, Vec<F::Model>)>, DbErr>
+    pub async fn all<C>(self, db: &C) -> Result<Vec<(E::Model, Vec<F::Model>)>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -667,7 +667,7 @@ where
     }
 
     /// Get an item from the Select query
-    pub async fn one<'a, C>(mut self, db: &C) -> Result<Option<S::Item>, DbErr>
+    pub async fn one<C>(mut self, db: &C) -> Result<Option<S::Item>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -676,7 +676,7 @@ where
     }
 
     /// Get all items from the Select query
-    pub async fn all<'a, C>(self, db: &C) -> Result<Vec<S::Item>, DbErr>
+    pub async fn all<C>(self, db: &C) -> Result<Vec<S::Item>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -911,7 +911,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn one<'a, C>(self, db: &C) -> Result<Option<S::Item>, DbErr>
+    pub async fn one<C>(self, db: &C) -> Result<Option<S::Item>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -962,7 +962,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn all<'a, C>(self, db: &C) -> Result<Vec<S::Item>, DbErr>
+    pub async fn all<C>(self, db: &C) -> Result<Vec<S::Item>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -986,7 +986,7 @@ where
     {
         let stream = db.stream(self.stmt).await?;
         Ok(Box::pin(stream.and_then(|row| {
-            futures::future::ready(S::from_raw_query_result(row))
+            futures_util::future::ready(S::from_raw_query_result(row))
         })))
     }
 }

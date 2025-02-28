@@ -21,6 +21,14 @@ pub struct OutputFile {
     pub content: String,
 }
 
+#[derive(Default, PartialEq, Eq, Clone, Copy, Debug)]
+pub enum WithPrelude {
+    #[default]
+    All,
+    None,
+    AllAllowUnusedImports,
+}
+
 #[derive(PartialEq, Eq, Debug)]
 pub enum WithSerde {
     None,
@@ -38,6 +46,7 @@ pub enum DateTimeCrate {
 #[derive(Debug)]
 pub struct EntityWriterContext {
     pub(crate) expanded_format: bool,
+    pub(crate) with_prelude: WithPrelude,
     pub(crate) with_serde: WithSerde,
     pub(crate) with_copy_enums: bool,
     pub(crate) date_time_crate: DateTimeCrate,
@@ -51,6 +60,7 @@ pub struct EntityWriterContext {
     pub(crate) enum_extra_derives: TokenStream,
     pub(crate) enum_extra_attributes: TokenStream,
     pub(crate) seaography: bool,
+    pub(crate) impl_active_model_behavior: bool,
 }
 
 impl WithSerde {
@@ -115,6 +125,23 @@ where
     )
 }
 
+impl FromStr for WithPrelude {
+    type Err = crate::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "none" => Self::None,
+            "all-allow-unused-imports" => Self::AllAllowUnusedImports,
+            "all" => Self::All,
+            v => {
+                return Err(crate::Error::TransformError(format!(
+                    "Unsupported enum variant '{v}'"
+                )))
+            }
+        })
+    }
+}
+
 impl FromStr for WithSerde {
     type Err = crate::Error;
 
@@ -137,6 +164,7 @@ impl EntityWriterContext {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         expanded_format: bool,
+        with_prelude: WithPrelude,
         with_serde: WithSerde,
         with_copy_enums: bool,
         date_time_crate: DateTimeCrate,
@@ -150,9 +178,11 @@ impl EntityWriterContext {
         enum_extra_derives: Vec<String>,
         enum_extra_attributes: Vec<String>,
         seaography: bool,
+        impl_active_model_behavior: bool,
     ) -> Self {
         Self {
             expanded_format,
+            with_prelude,
             with_serde,
             with_copy_enums,
             date_time_crate,
@@ -166,6 +196,7 @@ impl EntityWriterContext {
             enum_extra_derives: bonus_derive(enum_extra_derives),
             enum_extra_attributes: bonus_attributes(enum_extra_attributes),
             seaography,
+            impl_active_model_behavior,
         }
     }
 }
@@ -174,8 +205,11 @@ impl EntityWriter {
     pub fn generate(self, context: &EntityWriterContext) -> WriterOutput {
         let mut files = Vec::new();
         files.extend(self.write_entities(context));
-        files.push(self.write_index_file(context.lib));
-        files.push(self.write_prelude());
+        let with_prelude = context.with_prelude != WithPrelude::None;
+        files.push(self.write_index_file(context.lib, with_prelude, context.seaography));
+        if with_prelude {
+            files.push(self.write_prelude(context.with_prelude));
+        }
         if !self.enums.is_empty() {
             files.push(self.write_sea_orm_active_enums(
                 &context.with_serde,
@@ -226,6 +260,7 @@ impl EntityWriter {
                         &context.model_extra_derives,
                         &context.model_extra_attributes,
                         context.seaography,
+                        context.impl_active_model_behavior,
                     )
                 } else {
                     Self::gen_compact_code_blocks(
@@ -239,6 +274,7 @@ impl EntityWriter {
                         &context.model_extra_derives,
                         &context.model_extra_attributes,
                         context.seaography,
+                        context.impl_active_model_behavior,
                     )
                 };
                 Self::write(&mut lines, code_blocks);
@@ -250,17 +286,19 @@ impl EntityWriter {
             .collect()
     }
 
-    pub fn write_index_file(&self, lib: bool) -> OutputFile {
+    pub fn write_index_file(&self, lib: bool, prelude: bool, seaography: bool) -> OutputFile {
         let mut lines = Vec::new();
         Self::write_doc_comment(&mut lines);
         let code_blocks: Vec<TokenStream> = self.entities.iter().map(Self::gen_mod).collect();
-        Self::write(
-            &mut lines,
-            vec![quote! {
-                pub mod prelude;
-            }],
-        );
-        lines.push("".to_owned());
+        if prelude {
+            Self::write(
+                &mut lines,
+                vec![quote! {
+                    pub mod prelude;
+                }],
+            );
+            lines.push("".to_owned());
+        }
         Self::write(&mut lines, code_blocks);
         if !self.enums.is_empty() {
             Self::write(
@@ -269,6 +307,12 @@ impl EntityWriter {
                     pub mod sea_orm_active_enums;
                 }],
             );
+        }
+
+        if seaography {
+            lines.push("".to_owned());
+            let ts = Self::gen_seaography_entity_mod(&self.entities, &self.enums);
+            Self::write(&mut lines, vec![ts]);
         }
 
         let file_name = match lib {
@@ -282,9 +326,12 @@ impl EntityWriter {
         }
     }
 
-    pub fn write_prelude(&self) -> OutputFile {
+    pub fn write_prelude(&self, with_prelude: WithPrelude) -> OutputFile {
         let mut lines = Vec::new();
         Self::write_doc_comment(&mut lines);
+        if with_prelude == WithPrelude::AllAllowUnusedImports {
+            Self::write_allow_unused_imports(&mut lines)
+        }
         let code_blocks = self.entities.iter().map(Self::gen_prelude_use).collect();
         Self::write(&mut lines, code_blocks);
         OutputFile {
@@ -341,6 +388,11 @@ impl EntityWriter {
         lines.push("".to_owned());
     }
 
+    pub fn write_allow_unused_imports(lines: &mut Vec<String>) {
+        lines.extend(vec!["#![allow(unused_imports)]".to_string()]);
+        lines.push("".to_owned());
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn gen_expanded_code_blocks(
         entity: &Entity,
@@ -353,6 +405,7 @@ impl EntityWriter {
         model_extra_derives: &TokenStream,
         model_extra_attributes: &TokenStream,
         seaography: bool,
+        impl_active_model_behavior: bool,
     ) -> Vec<TokenStream> {
         let mut imports = Self::gen_import(with_serde);
         imports.extend(Self::gen_import_active_enum(entity));
@@ -379,7 +432,9 @@ impl EntityWriter {
         ];
         code_blocks.extend(Self::gen_impl_related(entity));
         code_blocks.extend(Self::gen_impl_conjunct_related(entity));
-        code_blocks.extend([Self::gen_impl_active_model_behavior()]);
+        if impl_active_model_behavior {
+            code_blocks.extend([Self::impl_active_model_behavior()]);
+        }
         if seaography {
             code_blocks.extend([Self::gen_related_entity(entity)]);
         }
@@ -398,6 +453,7 @@ impl EntityWriter {
         model_extra_derives: &TokenStream,
         model_extra_attributes: &TokenStream,
         seaography: bool,
+        impl_active_model_behavior: bool,
     ) -> Vec<TokenStream> {
         let mut imports = Self::gen_import(with_serde);
         imports.extend(Self::gen_import_active_enum(entity));
@@ -418,7 +474,9 @@ impl EntityWriter {
         ];
         code_blocks.extend(Self::gen_impl_related(entity));
         code_blocks.extend(Self::gen_impl_conjunct_related(entity));
-        code_blocks.extend([Self::gen_impl_active_model_behavior()]);
+        if impl_active_model_behavior {
+            code_blocks.extend([Self::impl_active_model_behavior()]);
+        }
         if seaography {
             code_blocks.extend([Self::gen_related_entity(entity)]);
         }
@@ -699,7 +757,7 @@ impl EntityWriter {
             .collect()
     }
 
-    pub fn gen_impl_active_model_behavior() -> TokenStream {
+    pub fn impl_active_model_behavior() -> TokenStream {
         quote! {
             impl ActiveModelBehavior for ActiveModel {}
         }
@@ -713,6 +771,48 @@ impl EntityWriter {
         quote! {
             pub mod #table_name_snake_case_ident;
         }
+    }
+
+    pub fn gen_seaography_entity_mod(
+        entities: &[Entity],
+        enums: &BTreeMap<String, ActiveEnum>,
+    ) -> TokenStream {
+        let mut ts = TokenStream::new();
+        for entity in entities {
+            let table_name_snake_case_ident = format_ident!(
+                "{}",
+                escape_rust_keyword(entity.get_table_name_snake_case_ident())
+            );
+            ts = quote! {
+                #ts
+                #table_name_snake_case_ident,
+            }
+        }
+        ts = quote! {
+            seaography::register_entity_modules!([
+                #ts
+            ]);
+        };
+
+        let mut enum_ts = TokenStream::new();
+        for active_enum in enums.values() {
+            let enum_name = &active_enum.enum_name.to_string();
+            let enum_iden = format_ident!("{}", enum_name.to_upper_camel_case());
+            enum_ts = quote! {
+                #enum_ts
+                sea_orm_active_enums::#enum_iden,
+            }
+        }
+        if !enum_ts.is_empty() {
+            ts = quote! {
+                #ts
+
+                seaography::register_active_enums!([
+                    #enum_ts
+                ]);
+            };
+        }
+        ts
     }
 
     pub fn gen_prelude_use(entity: &Entity) -> TokenStream {
@@ -1566,7 +1666,8 @@ mod tests {
                     false,
                     &TokenStream::new(),
                     &TokenStream::new(),
-                    false
+                    false,
+                    true,
                 )
                 .into_iter()
                 .skip(1)
@@ -1589,6 +1690,7 @@ mod tests {
                     &TokenStream::new(),
                     &TokenStream::new(),
                     false,
+                    true,
                 )
                 .into_iter()
                 .skip(1)
@@ -1653,6 +1755,7 @@ mod tests {
                     &TokenStream::new(),
                     &TokenStream::new(),
                     false,
+                    true,
                 )
                 .into_iter()
                 .skip(1)
@@ -1675,6 +1778,7 @@ mod tests {
                     &TokenStream::new(),
                     &TokenStream::new(),
                     false,
+                    true,
                 )
                 .into_iter()
                 .skip(1)
@@ -1709,6 +1813,7 @@ mod tests {
                 &TokenStream::new(),
                 &TokenStream::new(),
                 false,
+                true,
             ))
         );
         assert_eq!(
@@ -1726,6 +1831,7 @@ mod tests {
                 &TokenStream::new(),
                 &TokenStream::new(),
                 false,
+                true,
             ))
         );
         assert_eq!(
@@ -1743,6 +1849,7 @@ mod tests {
                 &TokenStream::new(),
                 &TokenStream::new(),
                 false,
+                true,
             ))
         );
         assert_eq!(
@@ -1758,6 +1865,7 @@ mod tests {
                 &TokenStream::new(),
                 &TokenStream::new(),
                 false,
+                true,
             ))
         );
 
@@ -1775,6 +1883,7 @@ mod tests {
                 &TokenStream::new(),
                 &TokenStream::new(),
                 false,
+                true,
             ))
         );
         assert_eq!(
@@ -1792,6 +1901,7 @@ mod tests {
                 &TokenStream::new(),
                 &TokenStream::new(),
                 false,
+                true,
             ))
         );
         assert_eq!(
@@ -1809,6 +1919,7 @@ mod tests {
                 &TokenStream::new(),
                 &TokenStream::new(),
                 false,
+                true,
             ))
         );
         assert_eq!(
@@ -1824,6 +1935,7 @@ mod tests {
                 &TokenStream::new(),
                 &TokenStream::new(),
                 false,
+                true,
             ))
         );
 
@@ -1906,6 +2018,7 @@ mod tests {
                 &TokenStream::new(),
                 &TokenStream::new(),
                 true,
+                true,
             ))
         );
 
@@ -1923,7 +2036,62 @@ mod tests {
                 &TokenStream::new(),
                 &TokenStream::new(),
                 true,
+                true,
             ))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_gen_with_seaography_mod() -> io::Result<()> {
+        use crate::ActiveEnum;
+        use sea_query::IntoIden;
+
+        let entities = setup();
+        let enums = vec![
+            (
+                "coinflip_result_type",
+                ActiveEnum {
+                    enum_name: Alias::new("coinflip_result_type").into_iden(),
+                    values: vec!["HEADS", "TAILS"]
+                        .into_iter()
+                        .map(|variant| Alias::new(variant).into_iden())
+                        .collect(),
+                },
+            ),
+            (
+                "media_type",
+                ActiveEnum {
+                    enum_name: Alias::new("media_type").into_iden(),
+                    values: vec![
+                        "UNKNOWN",
+                        "BITMAP",
+                        "DRAWING",
+                        "AUDIO",
+                        "VIDEO",
+                        "MULTIMEDIA",
+                        "OFFICE",
+                        "TEXT",
+                        "EXECUTABLE",
+                        "ARCHIVE",
+                        "3D",
+                    ]
+                    .into_iter()
+                    .map(|variant| Alias::new(variant).into_iden())
+                    .collect(),
+                },
+            ),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v))
+        .collect();
+
+        assert_eq!(
+            comparable_file_string(include_str!("../../tests/with_seaography/mod.rs"))?,
+            generated_to_string(vec![EntityWriter::gen_seaography_entity_mod(
+                &entities, &enums,
+            )])
         );
 
         Ok(())
@@ -1951,6 +2119,7 @@ mod tests {
                 &TokenStream::new(),
                 &TokenStream::new(),
                 false,
+                true,
             ))
         );
         assert_eq!(
@@ -1966,6 +2135,7 @@ mod tests {
                 &bonus_derive(["ts_rs::TS"]),
                 &TokenStream::new(),
                 false,
+                true,
             ))
         );
         assert_eq!(
@@ -1983,6 +2153,7 @@ mod tests {
                 &bonus_derive(["ts_rs::TS", "utoipa::ToSchema"]),
                 &TokenStream::new(),
                 false,
+                true,
             ))
         );
 
@@ -2002,6 +2173,7 @@ mod tests {
                 &TokenStream::new(),
                 &TokenStream::new(),
                 false,
+                true,
             ))
         );
         assert_eq!(
@@ -2019,6 +2191,7 @@ mod tests {
                 &bonus_derive(["ts_rs::TS"]),
                 &TokenStream::new(),
                 false,
+                true,
             ))
         );
         assert_eq!(
@@ -2036,6 +2209,7 @@ mod tests {
                 &bonus_derive(["ts_rs::TS", "utoipa::ToSchema"]),
                 &TokenStream::new(),
                 false,
+                true,
             ))
         );
 
@@ -2082,6 +2256,7 @@ mod tests {
                 &TokenStream,
                 &TokenStream,
                 bool,
+                bool,
             ) -> Vec<TokenStream>,
         >,
     ) -> io::Result<()> {
@@ -2114,6 +2289,7 @@ mod tests {
             &TokenStream::new(),
             &TokenStream::new(),
             false,
+            true,
         )
         .into_iter()
         .fold(TokenStream::new(), |mut acc, tok| {
@@ -2147,6 +2323,7 @@ mod tests {
                 &TokenStream::new(),
                 &TokenStream::new(),
                 false,
+                true,
             ))
         );
         assert_eq!(
@@ -2164,6 +2341,7 @@ mod tests {
                 &TokenStream::new(),
                 &bonus_attributes([r#"serde(rename_all = "camelCase")"#]),
                 false,
+                true,
             ))
         );
         assert_eq!(
@@ -2181,6 +2359,7 @@ mod tests {
                 &TokenStream::new(),
                 &bonus_attributes([r#"serde(rename_all = "camelCase")"#, "ts(export)"]),
                 false,
+                true,
             ))
         );
 
@@ -2200,6 +2379,7 @@ mod tests {
                 &TokenStream::new(),
                 &TokenStream::new(),
                 false,
+                true,
             ))
         );
         assert_eq!(
@@ -2217,6 +2397,7 @@ mod tests {
                 &TokenStream::new(),
                 &bonus_attributes([r#"serde(rename_all = "camelCase")"#]),
                 false,
+                true,
             ))
         );
         assert_eq!(
@@ -2234,6 +2415,7 @@ mod tests {
                 &TokenStream::new(),
                 &bonus_attributes([r#"serde(rename_all = "camelCase")"#, "ts(export)"]),
                 false,
+                true,
             ))
         );
 
@@ -2328,6 +2510,7 @@ mod tests {
                     &TokenStream::new(),
                     &TokenStream::new(),
                     false,
+                    true,
                 )
                 .into_iter()
                 .skip(1)
@@ -2350,6 +2533,7 @@ mod tests {
                     &TokenStream::new(),
                     &TokenStream::new(),
                     false,
+                    true,
                 )
                 .into_iter()
                 .skip(1)

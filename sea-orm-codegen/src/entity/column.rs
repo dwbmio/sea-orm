@@ -60,7 +60,6 @@ impl Column {
                 },
                 ColumnType::Timestamp => match date_time_crate {
                     DateTimeCrate::Chrono => "DateTimeUtc".to_owned(),
-                    // ColumnType::Timpestamp(_) => time::PrimitiveDateTime: https://docs.rs/sqlx/0.3.5/sqlx/postgres/types/index.html#time
                     DateTimeCrate::Time => "TimeDateTime".to_owned(),
                 },
                 ColumnType::TimestampWithTimeZone => match date_time_crate {
@@ -77,6 +76,15 @@ impl Column {
                 ColumnType::Array(column_type) => {
                     format!("Vec<{}>", write_rs_type(column_type, date_time_crate))
                 }
+                ColumnType::Vector(_) => "::pgvector::Vector".to_owned(),
+                ColumnType::Bit(None | Some(1)) => "bool".to_owned(),
+                ColumnType::Bit(_) | ColumnType::VarBit(_) => "Vec<u8>".to_owned(),
+                ColumnType::Year => "i32".to_owned(),
+                ColumnType::Interval(_, _)
+                | ColumnType::Cidr
+                | ColumnType::Inet
+                | ColumnType::MacAddr
+                | ColumnType::LTree => "String".to_owned(),
                 _ => unimplemented!(),
             }
         }
@@ -173,6 +181,10 @@ impl Column {
                     let column_type = write_col_def(column_type);
                     quote! { ColumnType::Array(RcOrArc::new(#column_type)) }
                 }
+                ColumnType::Vector(size) => match size {
+                    Some(size) => quote! { ColumnType::Vector(Some(#size)) },
+                    None => quote! { ColumnType::Vector(None) },
+                },
                 #[allow(unreachable_patterns)]
                 _ => unimplemented!(),
             }
