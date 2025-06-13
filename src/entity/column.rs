@@ -1,6 +1,7 @@
 use crate::{DbBackend, EntityName, Iden, IdenStatic, IntoSimpleExpr, Iterable};
 use sea_query::{
-    Alias, BinOper, DynIden, Expr, IntoIden, SeaRc, SelectStatement, SimpleExpr, Value,
+    Alias, BinOper, DynIden, Expr, IntoIden, IntoLikeExpr, SeaRc, SelectStatement, SimpleExpr,
+    Value,
 };
 use std::str::FromStr;
 
@@ -146,7 +147,7 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     /// ```
     fn like<T>(&self, s: T) -> SimpleExpr
     where
-        T: Into<String>,
+        T: IntoLikeExpr,
     {
         Expr::col((self.entity_name(), *self)).like(s)
     }
@@ -164,11 +165,16 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     /// ```
     fn not_like<T>(&self, s: T) -> SimpleExpr
     where
-        T: Into<String>,
+        T: IntoLikeExpr,
     {
         Expr::col((self.entity_name(), *self)).not_like(s)
     }
 
+    /// This is a simplified shorthand for a more general `like` method.
+    /// Use `like` if you need something more complex, like specifying an escape character.
+    ///
+    /// ## Examples
+    ///
     /// ```
     /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DbBackend};
     ///
@@ -188,6 +194,11 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
         Expr::col((self.entity_name(), *self)).like(pattern)
     }
 
+    /// This is a simplified shorthand for a more general `like` method.
+    /// Use `like` if you need something more complex, like specifying an escape character.
+    ///
+    /// ## Examples
+    ///
     /// ```
     /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DbBackend};
     ///
@@ -207,6 +218,11 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
         Expr::col((self.entity_name(), *self)).like(pattern)
     }
 
+    /// This is a simplified shorthand for a more general `like` method.
+    /// Use `like` if you need something more complex, like specifying an escape character.
+    ///
+    /// ## Examples
+    ///
     /// ```
     /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DbBackend};
     ///
@@ -1013,7 +1029,7 @@ mod tests {
         mod hello_expanded {
             use crate as sea_orm;
             use crate::entity::prelude::*;
-            use crate::sea_query::{Alias, Expr, SimpleExpr};
+            use crate::sea_query::{Expr, SimpleExpr};
 
             #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
             pub struct Entity;
@@ -1056,7 +1072,7 @@ mod tests {
 
                 fn select_as(&self, expr: Expr) -> SimpleExpr {
                     match self {
-                        Self::Two => expr.cast_as(Alias::new("integer")),
+                        Self::Two => expr.cast_as("integer"),
                         _ => self.select_enum_as(expr),
                     }
                 }
@@ -1144,7 +1160,7 @@ mod tests {
         mod hello_expanded {
             use crate as sea_orm;
             use crate::entity::prelude::*;
-            use crate::sea_query::{Alias, Expr, SimpleExpr};
+            use crate::sea_query::{Expr, SimpleExpr};
 
             #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
             pub struct Entity;
@@ -1187,7 +1203,7 @@ mod tests {
 
                 fn save_as(&self, val: Expr) -> SimpleExpr {
                     match self {
-                        Self::Two => val.cast_as(Alias::new("text")),
+                        Self::Two => val.cast_as("text"),
                         _ => self.save_enum_as(val),
                     }
                 }
@@ -1275,7 +1291,7 @@ mod tests {
         mod hello_expanded {
             use crate as sea_orm;
             use crate::entity::prelude::*;
-            use crate::sea_query::{Alias, Expr, SimpleExpr};
+            use crate::sea_query::{Expr, SimpleExpr};
 
             #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
             pub struct Entity;
@@ -1318,14 +1334,14 @@ mod tests {
 
                 fn select_as(&self, expr: Expr) -> SimpleExpr {
                     match self {
-                        Self::Two => expr.cast_as(Alias::new("integer")),
+                        Self::Two => expr.cast_as("integer"),
                         _ => self.select_enum_as(expr),
                     }
                 }
 
                 fn save_as(&self, val: Expr) -> SimpleExpr {
                     match self {
-                        Self::Two => val.cast_as(Alias::new("text")),
+                        Self::Two => val.cast_as("text"),
                         _ => self.save_enum_as(val),
                     }
                 }

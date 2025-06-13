@@ -209,7 +209,7 @@ impl SqlxMySqlPoolConnection {
             ) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'b>>
             + Send,
         T: Send,
-        E: std::error::Error + Send,
+        E: std::fmt::Display + std::fmt::Debug + Send,
     {
         let conn = self.pool.acquire().await.map_err(sqlx_conn_acquire_err)?;
         let transaction = DatabaseTransaction::new_mysql(
@@ -239,8 +239,14 @@ impl SqlxMySqlPoolConnection {
         }
     }
 
-    /// Explicitly close the MySQL connection
+    /// Explicitly close the MySQL connection.
+    /// See [`Self::close_by_ref`] for usage with references.
     pub async fn close(self) -> Result<(), DbErr> {
+        self.close_by_ref().await
+    }
+
+    /// Explicitly close the MySQL connection
+    pub async fn close_by_ref(&self) -> Result<(), DbErr> {
         self.pool.close().await;
         Ok(())
     }

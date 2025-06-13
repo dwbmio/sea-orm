@@ -25,8 +25,8 @@ pub async fn create_tables(db: &DatabaseConnection) -> Result<(), DbErr> {
         DbBackend::Postgres => {
             let schema = Schema::new(db_backend);
             let enum_create_stmt = Type::create()
-                .as_enum(Alias::new("tea"))
-                .values([Alias::new("EverydayTea"), Alias::new("BreakfastTea")])
+                .as_enum("tea")
+                .values(["EverydayTea", "BreakfastTea"])
                 .to_owned();
             assert_eq!(
                 db_backend.build(&enum_create_stmt),
@@ -63,6 +63,7 @@ pub async fn create_tables(db: &DatabaseConnection) -> Result<(), DbErr> {
         create_categories_table(db).await?;
         #[cfg(feature = "postgres-vector")]
         create_embedding_table(db).await?;
+        create_host_network_table(db).await?;
     }
 
     Ok(())
@@ -423,7 +424,7 @@ pub async fn create_collection_table(db: &DbConn) -> Result<ExecResult, DbErr> {
         )
         .col(
             ColumnDef::new(collection::Column::Name)
-                .custom(Alias::new("citext"))
+                .custom("citext")
                 .not_null(),
         )
         .col(
@@ -471,6 +472,36 @@ pub async fn create_collection_table(db: &DbConn) -> Result<ExecResult, DbErr> {
         .to_owned();
 
     create_table(db, &stmt, Collection).await
+}
+
+pub async fn create_host_network_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+    let stmt = sea_query::Table::create()
+        .table(host_network::Entity)
+        .col(
+            ColumnDef::new(host_network::Column::Id)
+                .integer()
+                .not_null()
+                .auto_increment()
+                .primary_key(),
+        )
+        .col(
+            ColumnDef::new(host_network::Column::Hostname)
+                .string()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(host_network::Column::Ipaddress)
+                .inet()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(host_network::Column::Network)
+                .cidr()
+                .not_null(),
+        )
+        .to_owned();
+
+    create_table(db, &stmt, HostNetwork).await
 }
 
 pub async fn create_pi_table(db: &DbConn) -> Result<ExecResult, DbErr> {
@@ -665,34 +696,30 @@ pub async fn create_bits_table(db: &DbConn) -> Result<ExecResult, DbErr> {
                 .auto_increment()
                 .primary_key(),
         )
-        .col(
-            ColumnDef::new(bits::Column::Bit0)
-                .custom(Alias::new("BIT"))
-                .not_null(),
-        )
+        .col(ColumnDef::new(bits::Column::Bit0).custom("BIT").not_null())
         .col(
             ColumnDef::new(bits::Column::Bit1)
-                .custom(Alias::new("BIT(1)"))
+                .custom("BIT(1)")
                 .not_null(),
         )
         .col(
             ColumnDef::new(bits::Column::Bit8)
-                .custom(Alias::new("BIT(8)"))
+                .custom("BIT(8)")
                 .not_null(),
         )
         .col(
             ColumnDef::new(bits::Column::Bit16)
-                .custom(Alias::new("BIT(16)"))
+                .custom("BIT(16)")
                 .not_null(),
         )
         .col(
             ColumnDef::new(bits::Column::Bit32)
-                .custom(Alias::new("BIT(32)"))
+                .custom("BIT(32)")
                 .not_null(),
         )
         .col(
             ColumnDef::new(bits::Column::Bit64)
-                .custom(Alias::new("BIT(64)"))
+                .custom("BIT(64)")
                 .not_null(),
         )
         .to_owned();
@@ -745,10 +772,21 @@ pub async fn create_value_type_table(db: &DbConn) -> Result<ExecResult, DbErr> {
                 .integer()
                 .not_null(),
         )
+        .col(
+            ColumnDef::new(value_type::value_type_general::Column::Tag1)
+                .string()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(value_type::value_type_general::Column::Tag2)
+                .string()
+                .not_null(),
+        )
         .to_owned();
 
     create_table(db, &general_stmt, value_type::value_type_general::Entity).await
 }
+
 pub async fn create_value_type_postgres_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     let postgres_stmt = sea_query::Table::create()
         .table(value_type::value_type_pg::Entity)
@@ -765,7 +803,7 @@ pub async fn create_value_type_postgres_table(db: &DbConn) -> Result<ExecResult,
                 .not_null(),
         )
         .col(
-            ColumnDef::new(json_vec::Column::StrVec)
+            ColumnDef::new(value_type::value_type_pg::Column::StrVec)
                 .array(sea_query::ColumnType::String(StringLen::None))
                 .not_null(),
         )
