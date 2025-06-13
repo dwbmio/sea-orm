@@ -250,6 +250,7 @@ impl Entity {
         &self,
         serde_skip_deserializing_primary_key: bool,
         serde_skip_hidden_column: bool,
+        serde_skip_option_none: bool,
     ) -> Vec<TokenStream> {
         self.columns
             .iter()
@@ -259,6 +260,7 @@ impl Entity {
                     is_primary_key,
                     serde_skip_deserializing_primary_key,
                     serde_skip_hidden_column,
+                    serde_skip_option_none,
                 )
             })
             .collect()
