@@ -5,6 +5,71 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 1.1.14 - 2025-07-21
+
+### Enhancements
+
+* [sea-orm-cli] Mask sensitive ENV values https://github.com/SeaQL/sea-orm/pull/2658
+
+### Bug Fixes
+
+* `FromJsonQueryResult`: panic on serialization failures https://github.com/SeaQL/sea-orm/pull/2635
+```rust
+#[derive(Clone, Debug, PartialEq, Deserialize, FromJsonQueryResult)]
+pub struct NonSerializableStruct;
+
+impl Serialize for NonSerializableStruct {
+    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        Err(serde::ser::Error::custom(
+            "intentionally failing serialization",
+        ))
+    }
+}
+
+let model = Model {
+    json: Some(NonSerializableStruct),
+};
+
+let _ = model.into_active_model().insert(&ctx.db).await; // panic here
+```
+
+## 1.1.13 - 2025-06-29
+
+### New Features
+
+* [sea-orm-cli] New `--frontend-format` flag to generate entities in pure Rust:
+```rust
+// for example, below is the normal (compact) Entity:
+use sea_orm::entity::prelude::*;
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
+#[sea_orm(table_name = "cake")]
+pub struct Model {
+    #[sea_orm(primary_key)]
+    #[serde(skip_deserializing)]
+    pub id: i32,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub name: Option<String> ,
+}
+// this is the generated frontend model, there is no SeaORM dependency:
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Model {
+    #[serde(skip_deserializing)]
+    pub id: i32,
+    pub name: Option<String> ,
+}
+```
+
+### Enhancements
+
+* Remove potential panics in `Loader` https://github.com/SeaQL/sea-orm/pull/2637
+
 ## 1.1.12 - 2025-05-27
 
 ### Enhancements

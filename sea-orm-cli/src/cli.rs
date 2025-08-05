@@ -95,7 +95,8 @@ you should provide the directory of that submodule.",
             short = 'u',
             long,
             env = "DATABASE_URL",
-            help = "Database URL"
+            help = "Database URL",
+            hide_env_values = true
         )]
         database_url: Option<String>,
 
@@ -165,7 +166,7 @@ pub enum MigrateSubcommands {
 #[derive(Subcommand, PartialEq, Eq, Debug)]
 pub enum GenerateSubcommands {
     #[command(about = "Generate entity")]
-    #[command(group(ArgGroup::new("formats").args(&["compact_format", "expanded_format"])))]
+    #[command(group(ArgGroup::new("formats").args(&["compact_format", "expanded_format", "frontend_format"])))]
     #[command(group(ArgGroup::new("group-tables").args(&["tables", "include_hidden_tables"])))]
     Entity {
         #[arg(long, help = "Generate entity file of compact format")]
@@ -173,6 +174,9 @@ pub enum GenerateSubcommands {
 
         #[arg(long, help = "Generate entity file of expanded format")]
         expanded_format: bool,
+
+        #[arg(long, help = "Generate entity file of frontend format")]
+        frontend_format: bool,
 
         #[arg(
             long,
@@ -228,7 +232,13 @@ pub enum GenerateSubcommands {
         )]
         database_schema: Option<String>,
 
-        #[arg(short = 'u', long, env = "DATABASE_URL", help = "Database URL")]
+        #[arg(
+            short = 'u',
+            long,
+            env = "DATABASE_URL",
+            help = "Database URL",
+            hide_env_values = true
+        )]
         database_url: String,
 
         #[arg(
