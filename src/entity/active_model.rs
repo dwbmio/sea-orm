@@ -1,6 +1,6 @@
 use crate::{
     ConnectionTrait, DeleteResult, EntityTrait, Iterable, PrimaryKeyArity, PrimaryKeyToColumn,
-    PrimaryKeyTrait, TryIntoModel, Value, error::*,
+    PrimaryKeyTrait, Value, error::*,
 };
 use async_trait::async_trait;
 use sea_query::{Nullable, ValueTuple};
@@ -522,7 +522,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     #[cfg(feature = "with-json")]
     fn set_from_json(&mut self, json: serde_json::Value) -> Result<(), DbErr>
     where
-        Self: TryIntoModel<<Self::Entity as EntityTrait>::Model>,
+        Self: crate::TryIntoModel<<Self::Entity as EntityTrait>::Model>,
         <<Self as ActiveModelTrait>::Entity as EntityTrait>::Model: IntoActiveModel<Self>,
         for<'de> <<Self as ActiveModelTrait>::Entity as EntityTrait>::Model:
             serde::de::Deserialize<'de> + serde::Serialize,
@@ -553,7 +553,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     #[cfg(feature = "with-json")]
     fn from_json(mut json: serde_json::Value) -> Result<Self, DbErr>
     where
-        Self: TryIntoModel<<Self::Entity as EntityTrait>::Model>,
+        Self: crate::TryIntoModel<<Self::Entity as EntityTrait>::Model>,
         <<Self as ActiveModelTrait>::Entity as EntityTrait>::Model: IntoActiveModel<Self>,
         for<'de> <<Self as ActiveModelTrait>::Entity as EntityTrait>::Model:
             serde::de::Deserialize<'de> + serde::Serialize,
@@ -633,7 +633,7 @@ pub trait ActiveModelTrait: Clone + Debug {
 ///
 /// /// The [EntityName] describes the name of a table
 /// impl EntityName for Entity {
-///     fn table_name(&self) -> &str {
+///     fn table_name(&self) -> &'static str {
 ///         "cake"
 ///     }
 /// }
@@ -1277,8 +1277,8 @@ mod tests {
             }))
             .unwrap(),
             cake::ActiveModel {
-                id: ActiveValue::Set(1),
-                name: ActiveValue::Set("Apple Pie".to_owned()),
+                id: Set(1),
+                name: Set("Apple Pie".to_owned()),
             }
         );
 
@@ -1288,8 +1288,19 @@ mod tests {
             }))
             .unwrap(),
             cake::ActiveModel {
-                id: ActiveValue::Set(1),
-                name: ActiveValue::NotSet,
+                id: Set(1),
+                name: NotSet,
+            }
+        );
+
+        assert_eq!(
+            cake::ActiveModel::from_json(json!({
+                "name": "Apple Pie",
+            }))
+            .unwrap(),
+            cake::ActiveModel {
+                id: NotSet,
+                name: Set("Apple Pie".to_owned()),
             }
         );
 
@@ -1301,9 +1312,9 @@ mod tests {
         assert_eq!(
             cake,
             cake::ActiveModel {
-                id: ActiveValue::NotSet,
-                name: ActiveValue::Set("Apple Pie".to_owned()),
-            },
+                id: NotSet,
+                name: Set("Apple Pie".to_owned()),
+            }
         );
     }
 

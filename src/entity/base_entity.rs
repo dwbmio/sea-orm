@@ -1,16 +1,17 @@
 use crate::{
     ActiveModelBehavior, ActiveModelTrait, ColumnTrait, Delete, DeleteMany, DeleteOne,
-    FromQueryResult, Insert, ModelTrait, PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, Related,
-    RelationBuilder, RelationTrait, RelationType, Select, Update, UpdateMany, UpdateOne,
+    FromQueryResult, Insert, InsertMany, ModelTrait, PrimaryKeyToColumn, PrimaryKeyTrait,
+    QueryFilter, Related, RelationBuilder, RelationTrait, RelationType, Select, Update, UpdateMany,
+    UpdateOne,
 };
 use sea_query::{Alias, Iden, IntoIden, IntoTableRef, IntoValueTuple, TableRef};
 use std::fmt::Debug;
 pub use strum::IntoEnumIterator as Iterable;
 
 /// Ensure the identifier for an Entity can be converted to a static str
-pub trait IdenStatic: Iden + Copy + Debug + 'static {
+pub trait IdenStatic: Iden + Copy + Debug + Send + Sync + 'static {
     /// Method to call to get the static string identity
-    fn as_str(&self) -> &str;
+    fn as_str(&self) -> &'static str;
 }
 
 /// A Trait for mapping an Entity to a database table
@@ -26,12 +27,7 @@ pub trait EntityName: IdenStatic + Default {
     }
 
     /// Get the name of the table
-    fn table_name(&self) -> &str;
-
-    /// Get the name of the module from the invoking `self.table_name()`
-    fn module_name(&self) -> &str {
-        self.table_name()
-    }
+    fn table_name(&self) -> &'static str;
 
     /// Get the [TableRef] from invoking the `self.schema_name()`
     fn table_ref(&self) -> TableRef {
@@ -279,11 +275,8 @@ pub trait EntityTrait: EntityName {
                 let col = key.into_column();
                 select = select.filter(col.eq(v));
             } else {
-                panic!("primary key arity mismatch");
+                unreachable!("primary key arity mismatch");
             }
-        }
-        if keys.next().is_some() {
-            panic!("primary key arity mismatch");
         }
         select
     }
@@ -447,9 +440,15 @@ pub trait EntityTrait: EntityName {
     ///     ..Default::default()
     /// };
     ///
+    /// let insert_result = cake::Entity::insert_many::<cake::ActiveModel, _>([])
+    ///     .exec(&db)
+    ///     .await?;
+    ///
+    /// assert_eq!(insert_result.last_insert_id, None);
+    ///
     /// let insert_result = cake::Entity::insert_many([apple, orange]).exec(&db).await?;
     ///
-    /// assert_eq!(insert_result.last_insert_id, 28);
+    /// assert_eq!(insert_result.last_insert_id, Some(28));
     ///
     /// assert_eq!(
     ///     db.into_transaction_log(),
@@ -495,7 +494,7 @@ pub trait EntityTrait: EntityName {
     ///
     /// let insert_result = cake::Entity::insert_many([apple, orange]).exec(&db).await?;
     ///
-    /// assert_eq!(insert_result.last_insert_id, 28);
+    /// assert_eq!(insert_result.last_insert_id, Some(28));
     ///
     /// assert_eq!(
     ///     db.into_transaction_log(),
@@ -589,7 +588,7 @@ pub trait EntityTrait: EntityName {
     ///             name: Set("Choco Pie".to_owned()),
     ///         },
     ///     ])
-    ///     .exec_with_returning_many(&db)
+    ///     .exec_with_returning(&db)
     ///     .await?,
     ///     [
     ///         cake::Model {
@@ -611,12 +610,12 @@ pub trait EntityTrait: EntityName {
     /// # Ok(())
     /// # }
     /// ```
-    fn insert_many<A, I>(models: I) -> Insert<A>
+    fn insert_many<A, I>(models: I) -> InsertMany<A>
     where
         A: ActiveModelTrait<Entity = Self>,
         I: IntoIterator<Item = A>,
     {
-        Insert::many(models)
+        InsertMany::many(models)
     }
 
     /// Update a model in database
@@ -989,11 +988,8 @@ pub trait EntityTrait: EntityName {
                 let col = key.into_column();
                 delete = delete.filter(col.eq(v));
             } else {
-                panic!("primary key arity mismatch");
+                unreachable!("primary key arity mismatch");
             }
-        }
-        if keys.next().is_some() {
-            panic!("primary key arity mismatch");
         }
         delete
     }
@@ -1115,5 +1111,25 @@ mod tests {
         delete_by_id("UUID".to_string());
         delete_by_id("UUID");
         delete_by_id(Cow::from("UUID"));
+    }
+
+    #[smol_potat::test]
+    async fn test_find_by_id() {
+        use crate::tests_cfg::{cake, cake_filling};
+        use crate::{DbBackend, EntityTrait, MockDatabase};
+
+        let db = MockDatabase::new(DbBackend::MySql).into_connection();
+
+        cake::Entity::find_by_id(1).all(&db).await.ok();
+        cake_filling::Entity::find_by_id((2, 3)).all(&db).await.ok();
+
+        // below does not compile:
+
+        // cake::Entity::find_by_id((1, 2)).all(&db).await.ok();
+        // cake_filling::Entity::find_by_id(1).all(&db).await.ok();
+        // cake_filling::Entity::find_by_id((1, 2, 3))
+        //     .all(&db)
+        //     .await
+        //     .ok();
     }
 }

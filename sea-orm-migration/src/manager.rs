@@ -28,8 +28,7 @@ impl<'c> SchemaManager<'c> {
     where
         S: StatementBuilder,
     {
-        let builder = self.conn.get_database_backend();
-        self.conn.execute(builder.build(&stmt)).await.map(|_| ())
+        self.conn.execute(&stmt).await.map(|_| ())
     }
 
     pub fn get_database_backend(&self) -> DbBackend {
@@ -117,14 +116,18 @@ impl SchemaManager<'_> {
             #[cfg(feature = "sqlx-sqlite")]
             DbBackend::Sqlite => sea_schema::sqlite::Sqlite.has_column(_table, _column),
             #[allow(unreachable_patterns)]
-            other => panic!("{other:?} feature is off"),
+            other => {
+                return Err(DbErr::BackendNotSupported {
+                    db: other.as_str(),
+                    ctx: "has_column",
+                });
+            }
         };
 
         #[allow(unreachable_code)]
-        let builder = self.conn.get_database_backend();
         let res = self
             .conn
-            .query_one(builder.build(&_stmt))
+            .query_one(&_stmt)
             .await?
             .ok_or_else(|| DbErr::Custom("Failed to check column exists".to_owned()))?;
 
@@ -144,14 +147,18 @@ impl SchemaManager<'_> {
             #[cfg(feature = "sqlx-sqlite")]
             DbBackend::Sqlite => sea_schema::sqlite::Sqlite.has_index(_table, _index),
             #[allow(unreachable_patterns)]
-            other => panic!("{other:?} feature is off"),
+            other => {
+                return Err(DbErr::BackendNotSupported {
+                    db: other.as_str(),
+                    ctx: "has_index",
+                });
+            }
         };
 
         #[allow(unreachable_code)]
-        let builder = self.conn.get_database_backend();
         let res = self
             .conn
-            .query_one(builder.build(&_stmt))
+            .query_one(&_stmt)
             .await?
             .ok_or_else(|| DbErr::Custom("Failed to check index exists".to_owned()))?;
 
@@ -172,13 +179,17 @@ where
         #[cfg(feature = "sqlx-sqlite")]
         DbBackend::Sqlite => sea_schema::sqlite::Sqlite.has_table(_table),
         #[allow(unreachable_patterns)]
-        other => panic!("{other:?} feature is off"),
+        other => {
+            return Err(DbErr::BackendNotSupported {
+                db: other.as_str(),
+                ctx: "has_table",
+            });
+        }
     };
 
     #[allow(unreachable_code)]
-    let builder = conn.get_database_backend();
     let res = conn
-        .query_one(builder.build(&_stmt))
+        .query_one(&_stmt)
         .await?
         .ok_or_else(|| DbErr::Custom("Failed to check table exists".to_owned()))?;
 

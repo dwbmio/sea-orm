@@ -1,5 +1,7 @@
 use super::*;
-use crate::common::setup::{create_enum, create_table, create_table_without_asserts};
+use crate::common::setup::{
+    create_enum, create_table, create_table_from_entity, create_table_without_asserts,
+};
 use sea_orm::{
     ConnectionTrait, DatabaseConnection, DbBackend, DbConn, EntityName, ExecResult, Schema,
     error::*, sea_query,
@@ -30,9 +32,15 @@ pub async fn create_tables(db: &DatabaseConnection) -> Result<(), DbErr> {
                 .to_owned();
             assert_eq!(
                 db_backend.build(&enum_create_stmt),
-                db_backend.build(&schema.create_enum_from_active_enum::<Tea>())
+                db_backend.build(&schema.create_enum_from_active_enum::<Tea>().unwrap())
             );
             vec![enum_create_stmt]
+        }
+        db => {
+            return Err(DbErr::BackendNotSupported {
+                db: db.as_str(),
+                ctx: "create_byte_primary_key_table",
+            });
         }
     };
     create_enum(db, &create_enum_stmts, ActiveEnum).await?;
@@ -180,6 +188,12 @@ pub async fn create_byte_primary_key_table(db: &DbConn) -> Result<ExecResult, Db
     match db.get_database_backend() {
         DbBackend::MySql => primary_key_col.binary_len(3),
         DbBackend::Sqlite | DbBackend::Postgres => primary_key_col.binary(),
+        db => {
+            return Err(DbErr::BackendNotSupported {
+                db: db.as_str(),
+                ctx: "create_byte_primary_key_table",
+            });
+        }
     };
 
     let stmt = sea_query::Table::create()
@@ -365,6 +379,7 @@ pub async fn create_json_struct_table(db: &DbConn) -> Result<ExecResult, DbErr> 
                 .not_null(),
         )
         .col(ColumnDef::new(json_struct::Column::JsonValueOpt).json())
+        .col(ColumnDef::new(json_struct::Column::JsonNonSerializable).json())
         .to_owned();
 
     create_table(db, &stmt, JsonStruct).await
@@ -407,7 +422,7 @@ pub async fn create_json_struct_vec_table(db: &DbConn) -> Result<ExecResult, DbE
 }
 
 pub async fn create_collection_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    db.execute(sea_orm::Statement::from_string(
+    db.execute_raw(sea_orm::Statement::from_string(
         db.get_database_backend(),
         "CREATE EXTENSION IF NOT EXISTS citext",
     ))
@@ -728,16 +743,9 @@ pub async fn create_bits_table(db: &DbConn) -> Result<ExecResult, DbErr> {
 }
 
 pub async fn create_dyn_table_name_lazy_static_table(db: &DbConn) -> Result<(), DbErr> {
-    use dyn_table_name_lazy_static::*;
+    use dyn_table_name::*;
 
-    let entities = [
-        Entity {
-            table_name: TableName::from_str_truncate("dyn_table_name_lazy_static_1"),
-        },
-        Entity {
-            table_name: TableName::from_str_truncate("dyn_table_name_lazy_static_2"),
-        },
-    ];
+    let entities = [Entity { table_name: 1 }, Entity { table_name: 2 }];
     for entity in entities {
         let create_table_stmt = sea_query::Table::create()
             .table(entity.table_ref())
@@ -784,7 +792,8 @@ pub async fn create_value_type_table(db: &DbConn) -> Result<ExecResult, DbErr> {
         )
         .to_owned();
 
-    create_table(db, &general_stmt, value_type::value_type_general::Entity).await
+    create_table(db, &general_stmt, value_type::value_type_general::Entity).await?;
+    create_table_from_entity(db, value_type::value_type_pk::Entity).await
 }
 
 pub async fn create_value_type_postgres_table(db: &DbConn) -> Result<ExecResult, DbErr> {

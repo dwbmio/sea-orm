@@ -1,3 +1,4 @@
+use super::sql_type_match::{arr_type_match, can_try_from_u64, col_type_match};
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::{DataEnum, Lit, Type, spanned::Spanned};
@@ -13,6 +14,7 @@ struct DeriveValueTypeStruct {
     ty: Type,
     column_type: TokenStream,
     array_type: TokenStream,
+    can_try_from_u64: bool,
 }
 
 struct DeriveValueTypeEnum {
@@ -84,7 +86,7 @@ impl DeriveValueTypeStruct {
                         let ty: TokenStream = syn::parse_str(&litstr.value())?;
                         col_type = Some(ty);
                     } else {
-                        return Err(meta.error(format!("Invalid column_type {:?}", lit)));
+                        return Err(meta.error(format!("Invalid column_type {lit:?}")));
                     }
                 } else if meta.path.is_ident("array_type") {
                     let lit = meta.value()?.parse()?;
@@ -92,7 +94,7 @@ impl DeriveValueTypeStruct {
                         let ty: TokenStream = syn::parse_str(&litstr.value())?;
                         arr_type = Some(ty);
                     } else {
-                        return Err(meta.error(format!("Invalid array_type {:?}", lit)));
+                        return Err(meta.error(format!("Invalid array_type {lit:?}")));
                     }
                 } else {
                     return Err(meta.error(format!("Invalid attribute {:?}", meta.path)));
@@ -114,17 +116,16 @@ impl DeriveValueTypeStruct {
         };
         let field_span = field.span();
 
-        let column_type =
-            crate::derives::sql_type_match::col_type_match(col_type, field_type, field_span);
-
-        let array_type =
-            crate::derives::sql_type_match::arr_type_match(arr_type, field_type, field_span);
+        let column_type = col_type_match(col_type, field_type, field_span);
+        let array_type = arr_type_match(arr_type, field_type, field_span);
+        let can_try_from_u64 = can_try_from_u64(field_type);
 
         Ok(Self {
             name,
             ty,
             column_type,
             array_type,
+            can_try_from_u64,
         })
     }
 
@@ -133,6 +134,24 @@ impl DeriveValueTypeStruct {
         let field_type = &self.ty;
         let column_type = &self.column_type;
         let array_type = &self.array_type;
+
+        let try_from_u64_impl = if self.can_try_from_u64 {
+            quote!(
+                #[automatically_derived]
+                impl sea_orm::TryFromU64 for #name {
+                    fn try_from_u64(n: u64) -> Result<Self, sea_orm::DbErr> {
+                        use std::convert::TryInto;
+                        Ok(Self(n.try_into().map_err(|e| sea_orm::DbErr::TryIntoErr {
+                            from: stringify!(u64),
+                            into: stringify!(#name),
+                            source: std::sync::Arc::new(e),
+                        })?))
+                    }
+                }
+            )
+        } else {
+            quote!()
+        };
 
         quote!(
             #[automatically_derived]
@@ -175,6 +194,8 @@ impl DeriveValueTypeStruct {
                     <#field_type as sea_orm::sea_query::Nullable>::null()
                 }
             }
+
+            #try_from_u64_impl
         )
     }
 }
@@ -203,7 +224,7 @@ impl DeriveValueTypeEnum {
                         let ty: TokenStream = syn::parse_str(&litstr.value())?;
                         from_str = Some(ty);
                     } else {
-                        return Err(meta.error(format!("Invalid from_str {:?}", lit)));
+                        return Err(meta.error(format!("Invalid from_str {lit:?}")));
                     }
                 } else if meta.path.is_ident("to_str") {
                     let lit = meta.value()?.parse()?;
@@ -211,14 +232,14 @@ impl DeriveValueTypeEnum {
                         let ty: TokenStream = syn::parse_str(&litstr.value())?;
                         to_str = Some(ty);
                     } else {
-                        return Err(meta.error(format!("Invalid to_str {:?}", lit)));
+                        return Err(meta.error(format!("Invalid to_str {lit:?}")));
                     }
                 } else if meta.path.is_ident("value_type") {
                     let lit = meta.value()?.parse()?;
                     if let Lit::Str(litstr) = lit {
                         value_type = Some(litstr.value());
                     } else {
-                        return Err(meta.error(format!("Invalid value_type {:?}", lit)));
+                        return Err(meta.error(format!("Invalid value_type {lit:?}")));
                     }
                 } else {
                     return Err(meta.error(format!("Invalid attribute {:?}", meta.path)));

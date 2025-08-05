@@ -153,10 +153,35 @@
 //! // find related models (eager)
 //! let cake_with_fruits: Vec<(cake::Model, Vec<fruit::Model>)> =
 //!     Cake::find().find_with_related(Fruit).all(db).await?;
-//!
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! ### Nested Select
+//!
+//! ```
+//! # use sea_orm::{DbConn, error::*, entity::*, query::*, tests_cfg::*};
+//! # async fn function(db: &DbConn) -> Result<(), DbErr> {
+//! use sea_orm::DerivePartialModel;
+//!
+//! #[derive(DerivePartialModel)]
+//! #[sea_orm(entity = "cake::Entity")]
+//! struct CakeWithFruit {
+//!     id: i32,
+//!     name: String,
+//!     #[sea_orm(nested)]
+//!     fruit: Option<fruit::Model>,
+//! }
+//!
+//! let cakes: Vec<CakeWithFruit> = cake::Entity::find()
+//!     .left_join(fruit::Entity)
+//!     .into_partial_model()
+//!     .all(db)
+//!     .await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
 //! ### Insert
 //! ```
 //! # use sea_orm::{DbConn, error::*, entity::*, query::*, tests_cfg::*};
@@ -185,11 +210,58 @@
 //! #     ..Default::default()
 //! # };
 //!
-//! // insert many
-//! Fruit::insert_many([apple, pear]).exec(db).await?;
+//! // insert many returning last insert id
+//! let result = Fruit::insert_many([apple, pear]).exec(db).await?;
+//! result.last_insert_id == Some(2);
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! ### Insert (advanced)
+//! ```
+//! # use sea_orm::{DbConn, TryInsertResult, error::*, entity::*, query::*, tests_cfg::*};
+//! # async fn function_1(db: &DbConn) -> Result<(), DbErr> {
+//! # let apple = fruit::ActiveModel {
+//! #     name: Set("Apple".to_owned()),
+//! #     ..Default::default() // no need to set primary key
+//! # };
+//! # let pear = fruit::ActiveModel {
+//! #     name: Set("Pear".to_owned()),
+//! #     ..Default::default()
+//! # };
+//! // insert many with returning (if supported by database)
+//! let models: Vec<fruit::Model> = Fruit::insert_many([apple, pear])
+//!     .exec_with_returning(db)
+//!     .await?;
+//! models[0]
+//!     == fruit::Model {
+//!         id: 1,
+//!         name: "Apple".to_owned(),
+//!         cake_id: None,
+//!     };
+//! # Ok(())
+//! # }
+//!
+//! # async fn function_2(db: &DbConn) -> Result<(), DbErr> {
+//! # let apple = fruit::ActiveModel {
+//! #     name: Set("Apple".to_owned()),
+//! #     ..Default::default() // no need to set primary key
+//! # };
+//! # let pear = fruit::ActiveModel {
+//! #     name: Set("Pear".to_owned()),
+//! #     ..Default::default()
+//! # };
+//! // insert with ON CONFLICT on primary key do nothing, with MySQL specific polyfill
+//! let result = Fruit::insert_many([apple, pear])
+//!     .on_conflict_do_nothing()
+//!     .exec(db)
+//!     .await?;
+//!
+//! matches!(result, TryInsertResult::Conflicted);
+//! # Ok(())
+//! # }
+//! ```
+//!
 //! ### Update
 //! ```
 //! # use sea_orm::{DbConn, error::*, entity::*, query::*, tests_cfg::*};
@@ -341,7 +413,20 @@
 //!
 //! [SeaQL.org](https://www.sea-ql.org/) is an independent open-source organization run by passionate developers. If you enjoy using our libraries, please star and share our repositories. If you feel generous, a small donation via [GitHub Sponsor](https://github.com/sponsors/SeaQL) will be greatly appreciated, and goes a long way towards sustaining the organization.
 //!
+//! ### Gold Sponsors
+//!
+//! <table><tr>
+//! <td><a href="https://qdx.co/">
+//!   <img src="https://www.sea-ql.org/static/sponsors/QDX.svg" width="138"/>
+//! </a></td>
+//! </tr></table>
+//!
+//! [QDX](https://qdx.co/) pioneers quantum dynamics-powered drug discovery, leveraging AI and supercomputing to accelerate molecular modeling.
+//! We're immensely grateful to QDX for sponsoring the development of SeaORM, the SQL toolkit that powers their data engineering workflows.
+//!
 //! ### Silver Sponsors
+//!
+//! We’re grateful to our silver sponsors: Digital Ocean, for sponsoring our servers. And JetBrains, for sponsoring our IDE.
 //!
 //! <table><tr>
 //! <td><a href="https://www.digitalocean.com/">
@@ -353,13 +438,27 @@
 //! </a></td>
 //! </tr></table>
 //!
-//! We’re immensely grateful to our sponsors: Digital Ocean, for sponsoring our servers. And JetBrains, for sponsoring our IDE.
-//!
 //! ## Mascot
 //!
 //! A friend of Ferris, Terres the hermit crab is the official mascot of SeaORM. His hobby is collecting shells.
 //!
 //! <img alt="Terres" src="https://www.sea-ql.org/SeaORM/img/Terres.png" width="400"/>
+//!
+//! ### Rustacean Sticker Pack 🦀
+//!
+//! The Rustacean Sticker Pack is the perfect way to express your passion for Rust.
+//! Our stickers are made with a premium water-resistant vinyl with a unique matte finish.
+//! Stick them on your laptop, notebook, or any gadget to show off your love for Rust!
+//!
+//! Sticker Pack Contents:
+//! - Logo of SeaQL projects: SeaQL, SeaORM, SeaQuery, Seaography, FireDBG
+//! - Mascot of SeaQL: Terres the Hermit Crab
+//! - Mascot of Rust: Ferris the Crab
+//! - The Rustacean word
+//!
+//! [Support SeaQL and get a Sticker Pack!](https://www.sea-ql.org/sticker-pack/) All proceeds contributes directly to the ongoing development of SeaQL projects.
+//!
+//! <a href="https://www.sea-ql.org/sticker-pack/"><img alt="Rustacean Sticker Pack by SeaQL" src="https://www.sea-ql.org/static/sticker-pack-1s.jpg" width="600"/></a>
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/SeaQL/sea-query/master/docs/SeaQL icon dark.png"
 )]
@@ -398,10 +497,10 @@ pub use schema::*;
 
 #[cfg(feature = "macros")]
 pub use sea_orm_macros::{
-    DeriveActiveEnum, DeriveActiveModel, DeriveActiveModelBehavior, DeriveColumn,
-    DeriveCustomColumn, DeriveDisplay, DeriveEntity, DeriveEntityModel, DeriveIden,
-    DeriveIntoActiveModel, DeriveMigrationName, DeriveModel, DerivePartialModel, DerivePrimaryKey,
-    DeriveRelatedEntity, DeriveRelation, DeriveValueType, FromJsonQueryResult, FromQueryResult,
+    DeriveActiveEnum, DeriveActiveModel, DeriveActiveModelBehavior, DeriveColumn, DeriveDisplay,
+    DeriveEntity, DeriveEntityModel, DeriveIden, DeriveIntoActiveModel, DeriveMigrationName,
+    DeriveModel, DerivePartialModel, DerivePrimaryKey, DeriveRelatedEntity, DeriveRelation,
+    DeriveValueType, FromJsonQueryResult, FromQueryResult,
 };
 
 pub use sea_query;

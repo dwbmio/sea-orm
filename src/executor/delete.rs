@@ -20,32 +20,33 @@ pub struct DeleteResult {
     pub rows_affected: u64,
 }
 
-impl<'a, A: 'a> DeleteOne<A>
+impl<A> DeleteOne<A>
 where
     A: ActiveModelTrait,
 {
     /// Execute a DELETE operation on one ActiveModel
-    pub fn exec<C>(self, db: &'a C) -> impl Future<Output = Result<DeleteResult, DbErr>> + 'a
+    pub async fn exec<C>(self, db: &C) -> Result<DeleteResult, DbErr>
     where
         C: ConnectionTrait,
     {
-        // so that self is dropped before entering await
-        exec_delete_only(self.query, db)
+        if let Some(err) = self.error {
+            return Err(err);
+        }
+        exec_delete_only(self.query, db).await
     }
 
     /// Execute an delete operation and return the deleted model
-    ///
-    /// # Panics
-    ///
-    /// Panics if the database backend does not support `DELETE RETURNING`
-    pub fn exec_with_returning<C>(
+    pub async fn exec_with_returning<C>(
         self,
-        db: &'a C,
-    ) -> impl Future<Output = Result<Option<<A::Entity as EntityTrait>::Model>, DbErr>> + 'a
+        db: &C,
+    ) -> Result<Option<<A::Entity as EntityTrait>::Model>, DbErr>
     where
         C: ConnectionTrait,
     {
-        exec_delete_with_returning_one::<A::Entity, _>(self.query, db)
+        if let Some(err) = self.error {
+            return Err(err);
+        }
+        exec_delete_with_returning_one::<A::Entity, _>(self.query, db).await
     }
 }
 
@@ -63,10 +64,6 @@ where
     }
 
     /// Execute an delete operation and return the deleted model
-    ///
-    /// # Panics
-    ///
-    /// Panics if the database backend does not support `DELETE RETURNING`
     pub fn exec_with_returning<C>(
         self,
         db: &C,
@@ -94,10 +91,6 @@ impl Deleter {
     }
 
     /// Execute an delete operation and return the deleted model
-    ///
-    /// # Panics
-    ///
-    /// Panics if the database backend does not support `DELETE RETURNING`
     pub fn exec_with_returning<E, C>(
         self,
         db: &C,
@@ -121,10 +114,7 @@ async fn exec_delete<C>(query: DeleteStatement, db: &C) -> Result<DeleteResult, 
 where
     C: ConnectionTrait,
 {
-    let builder = db.get_database_backend();
-    let statement = builder.build(&query);
-
-    let result = db.execute(statement).await?;
+    let result = db.execute(&query).await?;
     Ok(DeleteResult {
         rows_affected: result.rows_affected(),
     })
@@ -138,17 +128,19 @@ where
     E: EntityTrait,
     C: ConnectionTrait,
 {
-    let models = match db.support_returning() {
+    let db_backend = db.get_database_backend();
+    match db.support_returning() {
         true => {
-            let db_backend = db.get_database_backend();
             let delete_statement = db_backend.build(&query.returning_all().to_owned());
             SelectorRaw::<SelectModel<<E>::Model>>::from_statement(delete_statement)
                 .one(db)
-                .await?
+                .await
         }
-        false => unimplemented!("Database backend doesn't support RETURNING"),
-    };
-    Ok(models)
+        false => Err(DbErr::BackendNotSupported {
+            db: db_backend.as_str(),
+            ctx: "DELETE RETURNING",
+        }),
+    }
 }
 
 async fn exec_delete_with_returning_many<E, C>(
@@ -159,9 +151,9 @@ where
     E: EntityTrait,
     C: ConnectionTrait,
 {
-    let models = match db.support_returning() {
+    let db_backend = db.get_database_backend();
+    match db.support_returning() {
         true => {
-            let db_backend = db.get_database_backend();
             let returning = Query::returning().exprs(
                 E::Column::iter().map(|c| c.select_enum_as(c.into_returning_expr(db_backend))),
             );
@@ -169,9 +161,39 @@ where
             let delete_statement = db_backend.build(&query.to_owned());
             SelectorRaw::<SelectModel<<E>::Model>>::from_statement(delete_statement)
                 .all(db)
-                .await?
+                .await
         }
-        false => unimplemented!("Database backend doesn't support RETURNING"),
-    };
-    Ok(models)
+        false => Err(DbErr::BackendNotSupported {
+            db: db_backend.as_str(),
+            ctx: "DELETE RETURNING",
+        }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::tests_cfg::cake;
+
+    #[smol_potat::test]
+    async fn delete_error() {
+        use crate::{DbBackend, DbErr, Delete, EntityTrait, MockDatabase};
+
+        let db = MockDatabase::new(DbBackend::MySql).into_connection();
+
+        assert!(matches!(
+            Delete::one(cake::ActiveModel {
+                ..Default::default()
+            })
+            .exec(&db)
+            .await,
+            Err(DbErr::PrimaryKeyNotSet { .. })
+        ));
+
+        assert!(matches!(
+            cake::Entity::delete(cake::ActiveModel::default())
+                .exec(&db)
+                .await,
+            Err(DbErr::PrimaryKeyNotSet { .. })
+        ));
+    }
 }

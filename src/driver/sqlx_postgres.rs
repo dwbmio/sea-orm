@@ -13,8 +13,9 @@ use sea_query_binder::SqlxValues;
 use tracing::instrument;
 
 use crate::{
-    AccessMode, ConnectOptions, DatabaseConnection, DatabaseTransaction, DbBackend, IsolationLevel,
-    QueryStream, Statement, TransactionError, debug_print, error::*, executor::*,
+    AccessMode, ConnectOptions, DatabaseConnection, DatabaseConnectionType, DatabaseTransaction,
+    DbBackend, IsolationLevel, QueryStream, Statement, TransactionError, debug_print, error::*,
+    executor::*,
 };
 
 use super::sqlx_common::*;
@@ -47,7 +48,9 @@ impl From<PgPool> for SqlxPostgresPoolConnection {
 
 impl From<PgPool> for DatabaseConnection {
     fn from(pool: PgPool) -> Self {
-        DatabaseConnection::SqlxPostgresPoolConnection(pool.into())
+        DatabaseConnection {
+            inner: DatabaseConnectionType::SqlxPostgresPoolConnection(pool.into()),
+        }
     }
 }
 
@@ -114,22 +117,24 @@ impl SqlxPostgresConnector {
                 .await
                 .map_err(sqlx_error_to_conn_err)?
         };
-        Ok(DatabaseConnection::SqlxPostgresPoolConnection(
-            SqlxPostgresPoolConnection {
+        Ok(DatabaseConnection {
+            inner: DatabaseConnectionType::SqlxPostgresPoolConnection(SqlxPostgresPoolConnection {
                 pool,
                 metric_callback: None,
-            },
-        ))
+            }),
+        })
     }
 }
 
 impl SqlxPostgresConnector {
     /// Instantiate a sqlx pool connection to a [DatabaseConnection]
     pub fn from_sqlx_postgres_pool(pool: PgPool) -> DatabaseConnection {
-        DatabaseConnection::SqlxPostgresPoolConnection(SqlxPostgresPoolConnection {
-            pool,
-            metric_callback: None,
-        })
+        DatabaseConnection {
+            inner: DatabaseConnectionType::SqlxPostgresPoolConnection(SqlxPostgresPoolConnection {
+                pool,
+                metric_callback: None,
+            }),
+        }
     }
 }
 
@@ -602,7 +607,7 @@ pub(crate) fn from_sqlx_postgres_row_to_proxy_row(row: &sqlx::postgres::PgRow) -
                                 row.try_get::<Vec<ipnetwork::IpNetwork>, _>(c.ordinal())
                                     .expect("Failed to get ip address array")
                                     .iter()
-                                    .map(|val| Value::IpNetwork(Some(Box::new(val.clone()))))
+                                    .map(|val| Value::IpNetwork(Some(Box::new(*val))))
                                     .collect(),
                             )),
                         ),
@@ -639,7 +644,7 @@ pub(crate) fn from_sqlx_postgres_row_to_proxy_row(row: &sqlx::postgres::PgRow) -
                                 row.try_get::<Vec<chrono::NaiveDateTime>, _>(c.ordinal())
                                     .expect("Failed to get timestamp array")
                                     .iter()
-                                    .map(|val| Value::ChronoDateTime(Some(Box::new(val.clone()))))
+                                    .map(|val| Value::ChronoDateTime(Some(Box::new(*val))))
                                     .collect(),
                             )),
                         ),
@@ -675,7 +680,7 @@ pub(crate) fn from_sqlx_postgres_row_to_proxy_row(row: &sqlx::postgres::PgRow) -
                                 row.try_get::<Vec<chrono::NaiveDate>, _>(c.ordinal())
                                     .expect("Failed to get date array")
                                     .iter()
-                                    .map(|val| Value::ChronoDate(Some(Box::new(val.clone()))))
+                                    .map(|val| Value::ChronoDate(Some(Box::new(*val))))
                                     .collect(),
                             )),
                         ),
@@ -711,7 +716,7 @@ pub(crate) fn from_sqlx_postgres_row_to_proxy_row(row: &sqlx::postgres::PgRow) -
                                 row.try_get::<Vec<chrono::NaiveTime>, _>(c.ordinal())
                                     .expect("Failed to get time array")
                                     .iter()
-                                    .map(|val| Value::ChronoTime(Some(Box::new(val.clone()))))
+                                    .map(|val| Value::ChronoTime(Some(Box::new(*val))))
                                     .collect(),
                             )),
                         ),
@@ -747,9 +752,7 @@ pub(crate) fn from_sqlx_postgres_row_to_proxy_row(row: &sqlx::postgres::PgRow) -
                                 row.try_get::<Vec<chrono::DateTime<chrono::Utc>>, _>(c.ordinal())
                                     .expect("Failed to get timestamptz array")
                                     .iter()
-                                    .map(|val| {
-                                        Value::ChronoDateTimeUtc(Some(Box::new(val.clone())))
-                                    })
+                                    .map(|val| Value::ChronoDateTimeUtc(Some(Box::new(*val))))
                                     .collect(),
                             )),
                         ),
@@ -785,7 +788,7 @@ pub(crate) fn from_sqlx_postgres_row_to_proxy_row(row: &sqlx::postgres::PgRow) -
                                 row.try_get::<Vec<chrono::NaiveTime>, _>(c.ordinal())
                                     .expect("Failed to get timetz array")
                                     .iter()
-                                    .map(|val| Value::ChronoTime(Some(Box::new(val.clone()))))
+                                    .map(|val| Value::ChronoTime(Some(Box::new(*val))))
                                     .collect(),
                             )),
                         ),
@@ -817,7 +820,7 @@ pub(crate) fn from_sqlx_postgres_row_to_proxy_row(row: &sqlx::postgres::PgRow) -
                                 row.try_get::<Vec<uuid::Uuid>, _>(c.ordinal())
                                     .expect("Failed to get uuid array")
                                     .iter()
-                                    .map(|val| Value::Uuid(Some(Box::new(val.clone()))))
+                                    .map(|val| Value::Uuid(Some(Box::new(*val))))
                                     .collect(),
                             )),
                         ),

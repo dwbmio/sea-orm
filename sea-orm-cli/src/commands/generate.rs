@@ -17,6 +17,7 @@ pub async fn run_generate_command(
         GenerateSubcommands::Entity {
             compact_format: _,
             expanded_format,
+            frontend_format,
             include_hidden_tables,
             tables,
             ignore_tables,
@@ -219,6 +220,7 @@ pub async fn run_generate_command(
 
             let writer_context = EntityWriterContext::new(
                 expanded_format,
+                frontend_format,
                 WithPrelude::from_str(&with_prelude).expect("Invalid prelude option"),
                 WithSerde::from_str(&with_serde).expect("Invalid serde derive option"),
                 with_copy_enums,

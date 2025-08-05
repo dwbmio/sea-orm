@@ -74,7 +74,7 @@ where
             let from_tbl = if i > 0 {
                 Alias::new(format!("r{}", i - 1)).into_iden()
             } else {
-                rel.from_tbl.table().clone()
+                rel.from_tbl.sea_orm_table().clone()
             };
             let table_ref = rel.to_tbl;
 
@@ -101,7 +101,7 @@ where
             ));
             select_two.query().expr(SelectExpr {
                 expr: col.select_as(expr),
-                alias: Some(SeaRc::new(Alias::new(alias))),
+                alias: Some(alias.into_iden()),
                 window: None,
             });
         }
@@ -120,7 +120,7 @@ where
             let from_tbl = if i > 0 {
                 Alias::new(format!("r{}", i - 1)).into_iden()
             } else {
-                rel.from_tbl.table().clone()
+                rel.from_tbl.sea_orm_table().clone()
             };
             let table_ref = rel.to_tbl;
 
@@ -147,7 +147,7 @@ where
             ));
             select_two_many.query().expr(SelectExpr {
                 expr: col.select_as(expr),
-                alias: Some(SeaRc::new(Alias::new(alias))),
+                alias: Some(alias.into_iden()),
                 window: None,
             });
         }
