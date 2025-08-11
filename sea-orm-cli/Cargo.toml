@@ -51,7 +51,7 @@ glob = { version = "0.3", default-features = false }
 smol = "1.2.5"
 
 [features]
-default = ["codegen", "sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "runtime-async-std-native-tls", "async-std"]
+default = ["codegen", "sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "runtime-async-std-rustls", "async-std"]
 codegen = ["cli", "sqlx", "sea-schema", "sea-orm-codegen"]
 cli = ["clap", "dotenvy"]
 sqlx-mysql = ["sqlx?/sqlx-mysql", "sea-schema?/sqlx-mysql", "sea-schema?/mysql"]
