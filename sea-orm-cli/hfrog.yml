@@ -1,0 +1,10 @@
+pid: 0
+name: sea-orm-cli
+ver: 0.0.1
+md5: ''
+descript: make description here!
+cont_size: 0
+runtime: runtime
+s3_key: ''
+s3_inc_id: 0
+is_artifactory_ready: false

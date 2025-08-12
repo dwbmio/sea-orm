@@ -1,0 +1,7 @@
+#nexus
+NEXUS_ENDPOINT = "https://nexus.youxi123.com"
+NEXUS_REPO = "hs-raw-hosted"
+
+#nexus-credentials
+NEXUS_USERNAME = duanwenbin000946
+NEXUS_PASSWORD = a0KHEv86lM

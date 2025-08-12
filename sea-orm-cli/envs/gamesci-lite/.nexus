@@ -1,0 +1,7 @@
+#nexus
+NEXUS_ENDPOINT = "http://nexus.life-jt.com:8081"
+NEXUS_REPO = "raw-release"
+
+#nexus-credentials
+NEXUS_USERNAME = raw-blob-read-robot
+NEXUS_PASSWORD = asdfasdf
