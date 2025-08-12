@@ -857,7 +857,7 @@ impl EntityWriter {
             }
         }
         ts = quote! {
-            seaography::register_entity_modules!([
+            seaography::register_entity_modules_read_only!([
                 #ts
             ]);
         };
