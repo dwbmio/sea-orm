@@ -39,6 +39,7 @@ pub async fn run_generate_command(
             enum_extra_derives,
             enum_extra_attributes,
             seaography,
+            seaography_readonly,
             impl_active_model_behavior,
         } => {
             if verbose {
@@ -235,6 +236,7 @@ pub async fn run_generate_command(
                 enum_extra_derives,
                 enum_extra_attributes,
                 seaography,
+                seaography_readonly,
                 impl_active_model_behavior,
             );
             let output = EntityTransformer::transform(table_stmts)?.generate(&writer_context);

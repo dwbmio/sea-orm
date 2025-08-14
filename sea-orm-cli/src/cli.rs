@@ -336,6 +336,14 @@ pub enum GenerateSubcommands {
             long_help = "Generate helper Enumerations that are used by Seaography."
         )]
         seaography: bool,
+        
+        #[arg(
+            long, 
+            default_value = "false",
+            requires = "seaography",
+            long_help = "Define after seaography is need entity only need query , no mutation"
+        )]
+        seaography_readonly: bool,
 
         #[arg(
             long,

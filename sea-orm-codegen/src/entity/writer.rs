@@ -61,6 +61,7 @@ pub struct EntityWriterContext {
     pub(crate) enum_extra_derives: TokenStream,
     pub(crate) enum_extra_attributes: TokenStream,
     pub(crate) seaography: bool,
+    pub(crate) seaography_readonly: bool,
     pub(crate) impl_active_model_behavior: bool,
 }
 
@@ -180,6 +181,7 @@ impl EntityWriterContext {
         enum_extra_derives: Vec<String>,
         enum_extra_attributes: Vec<String>,
         seaography: bool,
+        seaography_readonly: bool,
         impl_active_model_behavior: bool,
     ) -> Self {
         Self {
@@ -199,6 +201,7 @@ impl EntityWriterContext {
             enum_extra_derives: bonus_derive(enum_extra_derives),
             enum_extra_attributes: bonus_attributes(enum_extra_attributes),
             seaography,
+            seaography_readonly,
             impl_active_model_behavior,
         }
     }
@@ -209,7 +212,7 @@ impl EntityWriter {
         let mut files = Vec::new();
         files.extend(self.write_entities(context));
         let with_prelude = context.with_prelude != WithPrelude::None;
-        files.push(self.write_index_file(context.lib, with_prelude, context.seaography));
+        files.push(self.write_index_file(context.lib, with_prelude, context.seaography, context.seaography_readonly));
         if with_prelude {
             files.push(self.write_prelude(context.with_prelude, context.frontend_format));
         }
@@ -304,7 +307,7 @@ impl EntityWriter {
             .collect()
     }
 
-    pub fn write_index_file(&self, lib: bool, prelude: bool, seaography: bool) -> OutputFile {
+    pub fn write_index_file(&self, lib: bool, prelude: bool, seaography: bool, seaography_readonly: bool) -> OutputFile {
         let mut lines = Vec::new();
         Self::write_doc_comment(&mut lines);
         let code_blocks: Vec<TokenStream> = self.entities.iter().map(Self::gen_mod).collect();
@@ -329,7 +332,7 @@ impl EntityWriter {
 
         if seaography {
             lines.push("".to_owned());
-            let ts = Self::gen_seaography_entity_mod(&self.entities, &self.enums);
+            let ts = Self::gen_seaography_entity_mod(&self.entities, &self.enums, seaography_readonly);
             Self::write(&mut lines, vec![ts]);
         }
 
@@ -844,6 +847,7 @@ impl EntityWriter {
     pub fn gen_seaography_entity_mod(
         entities: &[Entity],
         enums: &BTreeMap<String, ActiveEnum>,
+        seaography_readonly: bool,
     ) -> TokenStream {
         let mut ts = TokenStream::new();
         for entity in entities {
@@ -856,11 +860,22 @@ impl EntityWriter {
                 #table_name_snake_case_ident,
             }
         }
-        ts = quote! {
-            seaography::register_entity_modules_read_only!([
-                #ts
-            ]);
-        };
+
+
+        if seaography_readonly {    
+            ts = quote! {
+                seaography::register_entity_modules_read_only!([
+                    #ts
+                ]);
+            };
+        }
+        else {
+            ts = quote! {
+                seaography::register_entity_modules!([
+                    #ts
+                ]);
+            };
+        }
 
         let mut enum_ts = TokenStream::new();
         for active_enum in enums.values() {
@@ -2407,7 +2422,7 @@ mod tests {
         assert_eq!(
             comparable_file_string(include_str!("../../tests/with_seaography/mod.rs"))?,
             generated_to_string(vec![EntityWriter::gen_seaography_entity_mod(
-                &entities, &enums,
+                &entities, &enums,false
             )])
         );
 
